@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VRC Fingerprinter</title>
+<style>
+  :root{
+    --paper:#e6ebef;
+    --card:#f7f9fa;
+    --ink:#16202b;
+    --ink-soft:#5a6b7a;
+    --rule:#c3ceD7;
+    --stamp:#5b3a8e;
+    --stamp-ok:#1f6b4a;
+    --stamp-bad:#a52033;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  }
+
+  *{box-sizing:border-box}
+
+  body{
+    margin:0;
+    background:var(--paper);
+    background-image:linear-gradient(var(--rule) 1px, transparent 1px);
+    background-size:100% 28px;
+    color:var(--ink);
+    font-family:var(--serif);
+    font-size:16px;
+    line-height:1.55;
+    padding:32px 20px 80px;
+  }
+
+  .sheet{
+    max-width:760px;
+    margin:0 auto;
+    background:var(--card);
+    border:1px solid var(--rule);
+    border-top:3px solid var(--ink);
+    padding:32px 34px 38px;
+  }
+
+  header{border-bottom:1px solid var(--rule); padding-bottom:18px; margin-bottom:26px}
+
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.22em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin:0 0 8px;
+  }
+
+  h1{
+    font-family:var(--mono);
+    font-size:23px;
+    font-weight:600;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    margin:0 0 10px;
+  }
+
+  header p{margin:0; color:var(--ink-soft); font-size:14.5px; max-width:60ch}
+
+  .sep{
+    border:0;
+    border-top:1px solid var(--rule);
+    margin:40px 0;
+  }
+  .scope{
+    border:1px solid var(--stamp);
+    border-left-width:4px;
+    padding:16px 18px 18px;
+    margin:0;
+  }
+  .scope h2{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.2em;
+    text-transform:uppercase;
+    color:var(--stamp);
+    margin:0 0 8px;
+  }
+  .scope p{margin:0 0 14px; font-size:14.5px; color:var(--ink)}
+  .scope p.after{margin:14px 0 0; color:var(--ink-soft)}
+  .sample{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    font-family:var(--mono);
+    font-size:12.5px;
+  }
+  .sample .doc{
+    flex:1 1 0;
+    min-width:0;
+    background:#fff;
+    border:1px solid var(--rule);
+    padding:9px 11px;
+    white-space:pre;
+    overflow-x:auto;
+  }
+  .sample .eq{
+    flex:0 0 auto;
+    color:var(--stamp);
+    font-size:17px;
+    font-weight:700;
+  }
+  .sample .doc b{color:var(--stamp-bad); font-weight:700}
+  @media (max-width:560px){
+    .sample{flex-direction:column; align-items:stretch}
+    .sample .eq{text-align:center}
+  }
+
+  header p.caveat{margin:10px 0 0; font-size:14px}
+  header p.caveat a{color:var(--stamp); text-decoration:underline; text-underline-offset:2px}
+  .scope{scroll-margin-top:20px}
+  .scope:target{background:#f2eefa}
+
+  label.field{
+    display:block;
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin-bottom:8px;
+  }
+
+  textarea{
+    width:100%;
+    min-height:230px;
+    resize:vertical;
+    padding:14px 15px;
+    border:1px solid var(--rule);
+    background:#fff;
+    color:var(--ink);
+    font-family:var(--mono);
+    font-size:13px;
+    line-height:1.6;
+  }
+  textarea:focus{outline:2px solid var(--stamp); outline-offset:1px; border-color:transparent}
+  textarea.over{outline:2px dashed var(--stamp); outline-offset:1px; border-color:transparent; background:#fbfaff}
+
+  .row{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:14px;
+    margin-top:12px;
+  }
+
+  .count{font-family:var(--mono); font-size:12px; color:var(--ink-soft); margin-left:auto}
+
+  button{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    padding:11px 20px;
+    border:1px solid var(--ink);
+    background:var(--ink);
+    color:var(--card);
+    cursor:pointer;
+  }
+  button:hover{background:#000}
+  button:focus-visible{outline:2px solid var(--stamp); outline-offset:2px}
+  button.ghost{background:transparent; color:var(--ink)}
+  button.ghost:hover{background:var(--paper)}
+  button[disabled]{opacity:.4; cursor:default}
+
+  .filedrop{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--ink-soft);
+    border:1px dashed var(--rule);
+    padding:10px 14px;
+    cursor:pointer;
+  }
+  .filedrop.over{border-color:var(--stamp); color:var(--stamp)}
+  input[type=file]{display:none}
+
+  /* ---- the stamp ---- */
+  .stamp-wrap{margin-top:34px; min-height:20px}
+
+  .stamp{
+    --c:var(--stamp);
+    position:relative;
+    border:2px solid var(--c);
+    outline:1px solid var(--c);
+    outline-offset:3px;
+    color:var(--c);
+    padding:18px 22px 20px;
+    transform:rotate(-1.4deg);
+    background:transparent;
+  }
+  @media (prefers-reduced-motion:no-preference){
+    .stamp{animation:press .28s cubic-bezier(.2,.9,.3,1.2)}
+  }
+  @keyframes press{
+    from{transform:rotate(-1.4deg) scale(1.09); opacity:0}
+    to{transform:rotate(-1.4deg) scale(1); opacity:1}
+  }
+
+  .stamp .verdict{
+    font-family:var(--mono);
+    font-size:13px;
+    font-weight:700;
+    letter-spacing:.26em;
+    text-transform:uppercase;
+    margin:0 0 12px;
+  }
+  .stamp .hex{
+    font-family:var(--mono);
+    font-size:clamp(11px,2.9vw,15px);
+    letter-spacing:.16em;
+    line-height:1.75;
+    word-break:break-all;
+    margin:0;
+  }
+  .stamp .meta{
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    margin:12px 0 0;
+    opacity:.8;
+  }
+  .stamp.ok{--c:var(--stamp-ok)}
+  .stamp.bad{--c:var(--stamp-bad)}
+
+  .pair{
+    display:flex;
+    gap:14px;
+    align-items:stretch;
+  }
+  .pair > .block, .pair > .stamp{flex:1 1 auto; min-width:0}
+  .pair > button{flex:0 0 auto; white-space:nowrap; align-self:stretch; padding:11px 22px}
+  .pair.stamp-pair{margin-top:30px}
+
+  .block{
+    margin-top:0;
+    border:1px solid var(--rule);
+    background:#fff;
+    padding:14px 15px;
+    font-family:var(--mono);
+    font-size:12px;
+    line-height:1.65;
+    white-space:pre-wrap;
+    word-break:break-word;
+  }
+
+  .alert{
+    border:2px solid var(--stamp-bad);
+    color:var(--stamp-bad);
+    padding:13px 16px;
+    margin-bottom:18px;
+    font-size:14.5px;
+    line-height:1.5;
+  }
+  .alert.warn{border-color:#8a6a10; color:#8a6a10}
+  .alert .tag{
+    display:block;
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.2em;
+    text-transform:uppercase;
+    margin-bottom:5px;
+  }
+  .alert code{font-family:var(--mono); font-size:12.5px; word-break:break-all}
+
+  .note{
+    margin-top:30px;
+    border-left:3px solid var(--stamp);
+    padding:2px 0 2px 16px;
+    font-size:14.5px;
+    color:var(--ink-soft);
+  }
+  .note strong{color:var(--ink)}
+
+  #selftest{
+    max-width:760px;
+    margin:22px auto 0;
+    background:var(--card);
+    border:1px solid var(--rule);
+    padding:20px 24px 24px;
+    display:none;
+  }
+  #selftest.open{display:block}
+  #selftest h2{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:.2em;
+    text-transform:uppercase;
+    margin:0 0 4px;
+  }
+  #selftest p.lede{margin:0 0 16px; font-size:14px; color:var(--ink-soft)}
+  .verdict-bar{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    padding:10px 14px;
+    margin-bottom:14px;
+    border:2px solid var(--stamp-ok);
+    color:var(--stamp-ok);
+  }
+  .verdict-bar.bad{border-color:var(--stamp-bad); color:var(--stamp-bad)}
+  .tlist{font-family:var(--mono); font-size:12px; line-height:1.9; margin:0; padding:0; list-style:none}
+  .tlist li{display:flex; gap:10px; border-bottom:1px dotted var(--rule); padding:1px 0}
+  .tlist .r{flex:0 0 42px; font-weight:700}
+  .tlist .ok{color:var(--stamp-ok)}
+  .tlist .no{color:var(--stamp-bad)}
+  .tlist .nm{flex:1 1 auto; color:var(--ink)}
+  .tgroup{
+    font-family:var(--mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--ink-soft); margin:18px 0 6px;
+  }
+  footer{
+    max-width:760px;
+    margin:22px auto 0;
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.08em;
+    color:var(--ink-soft);
+    text-align:center;
+  }
+
+  @media (max-width:560px){
+    .sheet{padding:24px 18px 30px}
+    body{padding:18px 10px 60px}
+    .count{margin-left:0; width:100%}
+    .pair{flex-direction:column; align-items:stretch}
+    .pair > button{width:100%; align-self:auto}
+  }
+</style>
+</head>
+<body>
+
+<main class="sheet">
+  <header>
+    <p class="eyebrow">Veridian Residents&rsquo; Coalition</p>
+    <h1>Fingerprinter</h1>
+    <p>Paste a draft or policy below to get its fingerprint. If the text already carries a fingerprint, this checks whether it still matches. Everything runs in this page &mdash; nothing is uploaded anywhere.</p>
+    <p class="caveat">There are scenarios where changed text will <em>not</em> produce a different fingerprint. <a href="#limits">What a fingerprint does not cover</a></p>
+  </header>
+
+  <label class="field" for="src">Document text</label>
+  <textarea id="src" spellcheck="false" placeholder="Paste the full text of the document here &mdash; or drop a .txt file anywhere on this field."></textarea>
+
+  <div class="row">
+    <button id="go">Take fingerprint</button>
+    <label class="filedrop" id="drop">Or drop a .txt file here<input type="file" id="file" accept=".txt,text/plain"></label>
+    <span class="count" id="count">0 characters</span>
+  </div>
+
+  <div class="stamp-wrap" id="out" aria-live="polite"></div>
+
+  <div class="note">
+    <strong>For a document going to a vote,</strong> use Google Docs &rarr; File &rarr; Download &rarr; Plain text (.txt) and drop that file in, rather than copy-pasting. Copy-paste can silently drop footnotes and tables, which changes the fingerprint. Copy-paste is fine while you&rsquo;re still drafting.
+  </div>
+
+  <hr class="sep">
+
+  <section class="scope" id="limits">
+    <h2>What a fingerprint does not cover</h2>
+    <p>List numbering is stripped before hashing, so these two documents have the <strong>same fingerprint</strong>:</p>
+    <div class="sample">
+      <div class="doc"><b>1.</b> Socks must be worn at all times.
+<b>2.</b> Sessions are capped at fifteen minutes.
+<b>3.</b> Exceeding item <b>2</b> forfeits next week.</div>
+      <div class="eq">=</div>
+      <div class="doc"><b>2.</b> Socks must be worn at all times.
+<b>1.</b> Sessions are capped at fifteen minutes.
+<b>3.</b> Exceeding item <b>2</b> forfeits next week.</div>
+    </div>
+    <p class="after">Item 3 now penalizes bare feet rather than long sessions, and the fingerprint cannot tell. The same blind spot covers table rows and columns, and a leading initial (J. Chen and K. Chen are identical to it). A fingerprint attests to the words and their order &mdash; check numbering, tables, and names by reading.</p>
+  </section>
+</main>
+
+<section id="selftest" aria-live="polite">
+  <h2>Self-test</h2>
+  <p class="lede">Checks this page&rsquo;s hashing against published SHA-256 test vectors, and its text normalization against values produced by Fingerprinter.ipynb v1.2. Run it after any edit to this file, and any time you want to confirm the copy you&rsquo;re holding is intact.</p>
+  <div id="testout"></div>
+</section>
+
+<footer>v1.3 &middot; fingerprints identical to v1.2 &middot; works offline &middot; keep a copy in the document backups<br>
+<a href="#selftest" id="runtests">Run self-test</a></footer>
+
+<script>
+"use strict";
+
+/* ---------------------------------------------------------------
+   SHA-256 (FIPS 180-4). Self-contained so this file keeps working
+   offline, from a zip, with no network and no crypto.subtle.
+   --------------------------------------------------------------- */
+const K = [
+0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+
+function rotr(x,n){ return (x>>>n)|(x<<(32-n)); }
+
+function sha256Hex(str){
+  const bytes = new TextEncoder().encode(str);
+  const l = bytes.length;
+  const total = (((l + 8) >> 6) << 6) + 64;
+  const m = new Uint8Array(total);
+  m.set(bytes);
+  m[l] = 0x80;
+  const dv = new DataView(m.buffer);
+  dv.setUint32(total - 8, Math.floor(l / 536870912));      // high word of l*8
+  dv.setUint32(total - 4, ((l % 536870912) * 8) >>> 0);    // low word of l*8
+
+  let H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
+           0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const w = new Uint32Array(64);
+
+  for (let i = 0; i < total; i += 64){
+    for (let t = 0; t < 16; t++) w[t] = dv.getUint32(i + t*4);
+    for (let t = 16; t < 64; t++){
+      const x = w[t-15], y = w[t-2];
+      const s0 = rotr(x,7) ^ rotr(x,18) ^ (x>>>3);
+      const s1 = rotr(y,17) ^ rotr(y,19) ^ (y>>>10);
+      w[t] = (w[t-16] + s0 + w[t-7] + s1) >>> 0;
+    }
+    let [a,b,c,d,e,f,g,h] = H;
+    for (let t = 0; t < 64; t++){
+      const S1 = rotr(e,6) ^ rotr(e,11) ^ rotr(e,25);
+      const ch = (e & f) ^ (~e & g);
+      const t1 = (h + S1 + ch + K[t] + w[t]) >>> 0;
+      const S0 = rotr(a,2) ^ rotr(a,13) ^ rotr(a,22);
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const t2 = (S0 + maj) >>> 0;
+      h=g; g=f; f=e; e=(d+t1)>>>0; d=c; c=b; b=a; a=(t1+t2)>>>0;
+    }
+    H = [(H[0]+a)>>>0,(H[1]+b)>>>0,(H[2]+c)>>>0,(H[3]+d)>>>0,
+         (H[4]+e)>>>0,(H[5]+f)>>>0,(H[6]+g)>>>0,(H[7]+h)>>>0];
+  }
+  return H.map(v => v.toString(16).padStart(8,"0")).join("");
+}
+
+/* ---------------------------------------------------------------
+   Normalization — a direct port of Fingerprinter.ipynb v1.2's
+   normalize_text() / process_file(). Order of operations matters;
+   do not rearrange without re-fingerprinting every adopted policy.
+   --------------------------------------------------------------- */
+
+const START_MARK = "---------(Fingerprinter script should ignore the following!)-----------";
+const STOP_MARK  = "---------(Stop ignoring now)-----------";
+
+const LIGATURES = {
+  "\uFB01":"fi", "\uFB02":"fl", "\uFB03":"ffi", "\uFB04":"ffl", "\uFB00":"ff",
+  "\u00E6":"ae", "\u0153":"oe"
+};
+const CONFUSABLES = {
+  "\u201C":'"', "\u201D":'"', "\u2018":"'", "\u2019":"'",
+  "\u2013":"-", "\u2014":"-", "\u2026":"...", "\u00A0":" ",
+  "\u2212":"-", "\u00D7":"x", "\u00B7":".", "\u00AB":'"',
+  "\u00BB":'"', "\u201E":'"', "\u00A9":"(C)", "\u00AE":"(R)", "\u2122":"(TM)"
+};
+
+function onePass(t){
+  // strip numbered / lettered list markers
+  t = t.replace(/^\s*\d+\.\s*|^\s*[a-zA-Z]\.\s*/gm, "");
+  // strip bullet asterisks
+  t = t.replace(/^\s*\*\s+/gm, "");
+  // strip bold markers and tildes
+  t = t.replace(/\*\*/g, "");
+  t = t.replace(/~/g, "");
+  // "/r/sub" -> "r/sub" unless it ends the text
+  t = t.replace(/(?<!\w)\/r\/(?![^/\w]*$)/g, "r/");
+  // trim ends
+  t = t.trim();
+  // [1] -> 1
+  t = t.replace(/\[(\d+)\]/g, "$1");
+  // drop underscore-only lines
+  t = t.replace(/^_+$/gm, "");
+  // ligatures, then confusables
+  for (const [k,v] of Object.entries(LIGATURES)) t = t.split(k).join(v);
+  for (const [k,v] of Object.entries(CONFUSABLES)) t = t.split(k).join(v);
+  return t;
+}
+
+function normalize(text){
+  let prev;
+  do { prev = text; text = onePass(text); } while (text !== prev);
+  return text.replace(/\s+/g, "");
+}
+
+function stripIgnoredBlock(text){
+  const i = text.indexOf(START_MARK);
+  if (i === -1) return text;
+  const head = text.slice(0, i);
+  const rest = text.slice(i + START_MARK.length);
+  const j = rest.indexOf(STOP_MARK);
+  return j === -1 ? head : head + rest.slice(j + STOP_MARK.length);
+}
+
+// Python opens with universal newlines + utf-8-sig, so do the same here.
+function prepare(raw){
+  return raw.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
+}
+
+function fingerprint(raw){
+  return sha256Hex(normalize(stripIgnoredBlock(prepare(raw))));
+}
+
+function existingFingerprint(raw){
+  const text = prepare(raw);
+  const i = text.indexOf(START_MARK);
+  if (i === -1) return null;
+  const rest = text.slice(i + START_MARK.length);
+  const j = rest.indexOf(STOP_MARK);
+  const block = j === -1 ? rest : rest.slice(0, j);
+  const m = block.match(/\b[0-9a-fA-F]{64}\b/);
+  return m ? m[0].toLowerCase() : null;
+}
+
+function blockFor(hash){
+  return START_MARK + "\n" +
+    "The fingerprint (SHA-256 checksum) of this document's text content (with whitespace, special characters, and this message removed) is:\n" +
+    hash + "\n" +
+    "(Generated by Fingerprinter.ipynb version 1.3)\n" +
+    "https://github.com/dspumpkins/fingerprinter/blob/main/Fingerprinter.ipynb\n" +
+    "(Computed by fingerprint.html \u2014 fingerprints identical to v1.2)\n" +
+    STOP_MARK;
+}
+
+/* ---------------------------------------------------------------
+   v1.3 guard. Everything between the markers is excluded from the
+   fingerprint. If the stop marker goes missing, the rest of the
+   document is excluded too, and the document can verify as
+   unchanged while carrying text nobody fingerprinted. These checks
+   change no fingerprint; they only tell a human to look.
+   --------------------------------------------------------------- */
+
+const EXPECTED_HINTS = ["fingerprint","sha-256","checksum","generated by",
+  "computed by","whitespace","special characters","message removed",
+  "fingerprinter","github.com","colab.research","version"];
+
+function lineIsExpected(line){
+  const s = line.trim();
+  if (!s) return true;
+  if (/^[0-9a-fA-F]{64}$/.test(s)) return true;
+  if (/^[-_=]{4,}$/.test(s)) return true;
+  const low = s.toLowerCase();
+  return EXPECTED_HINTS.some(h => low.includes(h));
+}
+
+function countOccurrences(text, needle){
+  let n = 0, i = 0;
+  while ((i = text.indexOf(needle, i)) !== -1){ n++; i += needle.length; }
+  return n;
+}
+
+function auditIgnoreBlock(raw){
+  const text = prepare(raw);
+  const problems = [];
+  const starts = countOccurrences(text, START_MARK);
+  const stops  = countOccurrences(text, STOP_MARK);
+
+  if (starts === 0){
+    if (stops > 0) problems.push(["warn",
+      "Found a stop marker with no start marker. Nothing was excluded from the fingerprint \u2014 check the block is intact."]);
+    return problems;
+  }
+
+  if (starts > 1) problems.push(["warn",
+    "Found " + starts + " start markers. Only the first block is excluded from the fingerprint \u2014 text in later blocks <em>is</em> fingerprinted, which is probably not what was intended."]);
+
+  const tail = text.slice(text.indexOf(START_MARK) + START_MARK.length);
+  const j = tail.indexOf(STOP_MARK);
+
+  if (j === -1){
+    problems.push(["critical",
+      "No stop marker. Everything after the start marker \u2014 " + tail.length +
+      " characters \u2014 is excluded from the fingerprint. A document in this state can verify as unchanged while containing text that was never fingerprinted. Restore the line:<br><code>" +
+      STOP_MARK + "</code>"]);
+    return problems;
+  }
+
+  const block = tail.slice(0, j);
+  const unexpected = block.split("\n").filter(l => !lineIsExpected(l)).map(l => l.trim());
+  if (unexpected.length){
+    let preview = unexpected[0];
+    if (preview.length > 70) preview = preview.slice(0,70) + "\u2026";
+    problems.push(["warn",
+      "The ignore block contains " + unexpected.length + " line(s) that do not look like part of a fingerprint statement. This text is <em>not</em> fingerprinted. First one:<br><code>" +
+      preview.replace(/&/g,"&amp;").replace(/</g,"&lt;") + "</code>"]);
+  }
+  if (!block.trim()) problems.push(["warn",
+    "The ignore block is empty. If this document is meant to carry a fingerprint, it is missing."]);
+
+  return problems;
+}
+
+/* ---------------- interface ---------------- */
+
+const src = document.getElementById("src");
+const out = document.getElementById("out");
+const count = document.getElementById("count");
+const drop = document.getElementById("drop");
+const fileInput = document.getElementById("file");
+
+function updateCount(){
+  const n = src.value.length;
+  count.textContent = n.toLocaleString() + (n === 1 ? " character" : " characters");
+}
+
+function grid(hash){
+  return hash.match(/.{1,16}/g).join("\n");
+}
+
+function render(){
+  const raw = src.value;
+  if (!raw.trim()){
+    out.innerHTML = '<div class="pair stamp-pair"><p class="stamp"><span class="verdict">Nothing to fingerprint</span>' +
+      '<span class="hex" style="letter-spacing:0;font-size:13px">Paste the document text above, then take its fingerprint.</span></p></div>';
+    return;
+  }
+
+  const hash = fingerprint(raw);
+  const claimed = existingFingerprint(raw);
+  const problems = auditIgnoreBlock(raw);
+  const critical = problems.some(p => p[0] === "critical");
+
+  const alerts = problems.map(([sev, msg]) =>
+    '<div class="alert' + (sev === "warn" ? " warn" : "") + '">' +
+    '<span class="tag">' + (sev === "critical" ? "Do not trust this document" : "Check this") + '</span>' +
+    msg + '</div>').join("");
+
+  let cls = "", verdict = "Fingerprint", meta = "SHA-256 &middot; v1.2 normalization";
+  if (claimed){
+    if (claimed === hash){
+      if (critical){
+        cls = " bad"; verdict = "Cannot verify";
+        meta = "The recorded fingerprint matches, but part of the document is excluded";
+      } else {
+        cls = " ok"; verdict = "Matches &mdash; unchanged";
+        meta = "The fingerprint in this document is still correct";
+      }
+    } else {
+      cls = " bad"; verdict = "Does not match";
+      meta = "Document says " + claimed.slice(0,16) + "\u2026 &mdash; replace it with the fingerprint above";
+    }
+  }
+
+  out.innerHTML =
+    alerts +
+    '<div class="pair">' +
+      '<div class="block" id="block">' + blockFor(hash).replace(/&/g,"&amp;").replace(/</g,"&lt;") + '</div>' +
+      '<button class="ghost" id="copyBlock">Copy this block</button>' +
+    '</div>' +
+    '<div class="pair stamp-pair">' +
+      '<div class="stamp' + cls + '">' +
+        '<p class="verdict">' + verdict + '</p>' +
+        '<p class="hex">' + grid(hash).replace(/\n/g,"<br>") + '</p>' +
+        '<p class="meta">' + meta + '</p>' +
+      '</div>' +
+      '<button class="ghost" id="copyHash">Copy fingerprint only</button>' +
+    '</div>';
+
+  document.getElementById("copyBlock").onclick = e => copy(blockFor(hash), e.target);
+  document.getElementById("copyHash").onclick  = e => copy(hash, e.target);
+}
+
+function copy(text, btn){
+  const done = () => { const o = btn.textContent; btn.textContent = "Copied"; setTimeout(()=>btn.textContent=o, 1400); };
+  if (navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(text).then(done, ()=>fallback(text, done));
+  } else fallback(text, done);
+}
+function fallback(text, done){
+  const ta = document.createElement("textarea");
+  ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand("copy"); done(); } catch(e){}
+  document.body.removeChild(ta);
+}
+
+document.getElementById("go").onclick = render;
+src.addEventListener("input", updateCount);
+
+function loadFile(f){
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { src.value = r.result; updateCount(); render(); };
+  r.readAsText(f);
+}
+fileInput.addEventListener("change", e => loadFile(e.target.files[0]));
+
+function acceptDrops(el, activeClass){
+  el.addEventListener("dragover", e => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    el.classList.add(activeClass);
+  });
+  el.addEventListener("dragleave", () => el.classList.remove(activeClass));
+  el.addEventListener("drop", e => {
+    e.preventDefault();
+    el.classList.remove(activeClass);
+    if (e.dataTransfer.files && e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]);
+  });
+}
+
+acceptDrops(drop, "over");
+acceptDrops(src, "over");
+
+updateCount();
+
+/* ---------------------------------------------------------------
+   Self-test. SHA-256 vectors are from FIPS 180-2 / NIST CAVP.
+   Normalization vectors were produced by Fingerprinter.ipynb v1.2
+   and are frozen: if one of these changes, this page has drifted
+   from the notebook and fingerprints computed here are no longer
+   comparable to fingerprints in the vote log.
+   --------------------------------------------------------------- */
+
+const SHA_VECTORS = [
+  ["empty string", "", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"],
+  ["abc", "abc", "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"],
+  ["448-bit message", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq",
+   "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1"],
+  ["896-bit message", "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu",
+   "cf5b16a778af8380036ce59e7b0492370b249b11e8f07a51afac45037afee9d1"],
+  ["one million a's", "a".repeat(1000000), "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0"]
+];
+
+const NORM_VECTORS = [
+  ["empty document","","e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"],
+  ["plain sentence","The VRC resolves to operate ethically.","f326e2d057001cf5573a425ddbc1bd578f84351d4c302dc6b4678b095b4fb5ae"],
+  ["numbered list","1. First item\n2. Second item\n10. Tenth item\n","82ec97859e1451931c702bbaa331d1fd85887e7d8a2ae43dde08d3d8e6ecf0aa"],
+  ["lettered list","a. alpha\nb. beta\nZ. zulu\n","198f440a3f162d1302d7c80388f1da71b7371f07280583c685528b94e2d17b6c"],
+  ["bullet list","* one\n*  two\n*\tthree\n","4592092e1061c7ea85af2aed194621cc17a2762bae33a79bf8ce33fd0168b801"],
+  ["bold and tildes","**bold** and ~tilde~ text\n","bf79282153e833e8858212bddc331ac981a04af89c41588b082d73a7341995ee"],
+  ["footnote markers","See [1] and [12] and [x] and []\n","37d9ba3154eaf6adc2b99f208f05254401ac2ec4ac4faac215f274020a93e12d"],
+  ["underscore rule line","text\n_______\nmore\n","320bd03050cc6f4a0ad9bd63b8b44008b580b591e871990c459f2d4d8663299a"],
+  ["smart quotes and dashes","\u201cquoted\u201d \u2018single\u2019 \u2013dash\u2014 \u2026","1c2618413bcea095fa691b27cd0982cc887e85a43f2d0e979de48602d8659a25"],
+  ["non-breaking spaces","a\u00a0b\u00a0\u00a0c","ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"],
+  ["ligatures","\ufb01re \ufb02ow \ufb00ee \u00e6ther \u0153uvre","da482ff888844544ef66f74df6f7e3f811190f5f2dace9cd1de11661676293e5"],
+  ["confusable symbols","\u2212 \u00d7 \u00b7 \u00ab \u00bb \u00a9 \u00ae \u2122","eacbc92f1c06762cf4d66cd0ec489637c71e4cae0a6b6a725678141aa9fb1368"],
+  ["subreddit mid-text","visit /r/veridian_rc_ssmd today","139273052513e167032da789e126e8f4c9359f4fd42021141255b25fa3cfc921"],
+  ["subreddit at end","visit /r/veridian_rc_ssmd","0115e12f9aaa0716f3e4ceed73d8bb46b20d54fa54ceaab9ba365a39a78b8c1d"],
+  ["windows line endings","line one\r\nline two\r\n1. item\r\n","767b8acf3e663db293368520711b82b1bdb8db807e6d63876e50189a8b2fe50a"],
+  ["byte order mark","\ufeffLeading BOM text","97cde045592909580205d1292a84041dbb391510abb86aee0843fb282026a0a9"],
+  ["ignored block excluded","Body text here\n---------(Fingerprinter script should ignore the following!)-----------\nThe fingerprint is:\ndeadbeef\n---------(Stop ignoring now)-----------\ntrailing text","79bd95c8f7c2a7465cf5b2e2f64de0a167d2775935a1b1062b62c218181d83d0"],
+  ["unterminated ignore block","Body\n---------(Fingerprinter script should ignore the following!)-----------\nno stop marker","6ccaa6415b5ee449e3c5c716f57b4608ebe3b780f5aa6b077bc5d8eee5d961f9"],
+  ["cascading rules","1. a. * **x** [1]\n","ec31682fde561917952ff78a7a8adeffd0febc372dd26871916c46c630381b45"],
+  ["collapses to nothing","1. \n2. \n* \n~~\n**\n____\n","e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"],
+  ["whitespace only","   \n\t\n  ","e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"],
+  ["multibyte utf-8","\u65e5\u672c\u8a9e caf\u00e9 \ud83c\udfe2","5bbb132a3025de22507f1ebaf49352c91fce2d9c647ba862ecbe95a94b9313fb"]
+];
+
+function runTests(){
+  const box = document.getElementById("testout");
+  let pass = 0, fail = 0;
+  const row = (ok, name) => {
+    ok ? pass++ : fail++;
+    return '<li><span class="r ' + (ok ? "ok" : "no") + '">' + (ok ? "pass" : "FAIL") +
+           '</span><span class="nm">' + name.replace(/&/g,"&amp;").replace(/</g,"&lt;") + '</span></li>';
+  };
+
+  let sha = "", norm = "";
+  for (const [name, input, want] of SHA_VECTORS) sha += row(sha256Hex(input) === want, name);
+  for (const [name, input, want] of NORM_VECTORS) norm += row(fingerprint(input) === want, name);
+
+  const total = pass + fail;
+  box.innerHTML =
+    '<div class="verdict-bar' + (fail ? " bad" : "") + '">' +
+      (fail ? fail + " of " + total + " checks failed \u2014 do not use this copy"
+            : "All " + total + " checks passed") +
+    '</div>' +
+    '<p class="tgroup">SHA-256 against published vectors</p><ul class="tlist">' + sha + '</ul>' +
+    '<p class="tgroup">Normalization against Fingerprinter.ipynb v1.2</p><ul class="tlist">' + norm + '</ul>';
+}
+
+document.getElementById("runtests").addEventListener("click", () => {
+  const panel = document.getElementById("selftest");
+  panel.classList.add("open");
+  runTests();
+  panel.scrollIntoView({behavior: "smooth", block: "start"});
+});
+if (location.hash === "#selftest"){
+  document.getElementById("selftest").classList.add("open");
+  runTests();
+}
+</script>
+</body>
+</html>
